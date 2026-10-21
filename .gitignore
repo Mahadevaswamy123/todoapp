@@ -1,0 +1,22 @@
+# Dependencies
+**/node_modules/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build output
+TodoApp/android/.gradle/
+TodoApp/android/**/build/
+TodoApp/ios/Pods/
+TodoApp/ios/build/
+TodoApp/ios/DerivedData/
+coverage/
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
