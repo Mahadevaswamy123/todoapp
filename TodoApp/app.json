@@ -1,18 +1,10 @@
 {
   "name": "TodoApp",
   "displayName": "TodoApp",
-  "expo": {
-    "name": "TodoApp",
-    "slug": "todoapp",
-    "version": "1.0.0",
-    "android": {
-      "package": "com.todoapp"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "981c3dd8-527f-4177-8b72-d8ff802697b4"
-      }
-    },
-    "owner": "mahadevaswamyhs"
-  }
+  "extra": {
+    "eas": {
+      "projectId": "981c3dd8-527f-4177-8b72-d8ff802697b4"
+    }
+  },
+  "owner": "mahadevaswamyhs"
 }

@@ -1,45 +1,47 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { Category, Priority, RootStackParamList } from '../types';
 import { api } from '../api/client';
 import { colors, spacing } from '../theme';
 import { ErrorBanner, Field, PrimaryButton, Eyebrow } from '../components/Ui';
+import { DateTimePickerModal } from '../components/DateTimePickerModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateTask'>;
 
 const CATEGORIES: Category[] = ['General', 'Work', 'Personal', 'Study', 'Urgent'];
 
+function formatDisplayDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+
 export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [dateTimeStr, setDateTimeStr] = React.useState('');
-  const [deadlineStr, setDeadlineStr] = React.useState('');
+  const [dateTimeIso, setDateTimeIso] = React.useState<string | null>(null);
+  const [deadlineIso, setDeadlineIso] = React.useState<string | null>(null);
   const [priority, setPriority] = React.useState<Priority>('medium');
   const [category, setCategory] = React.useState<Category>('General');
 
+  const [activePicker, setActivePicker] = React.useState<'dateTime' | 'deadline' | null>(null);
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  const parseDateTimeInput = (input: string): string | null => {
-    const trimmed = input.trim();
-    if (!trimmed) return null;
-
-    // YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      const d = new Date(`${trimmed}T12:00:00`);
-      return Number.isNaN(d.getTime()) ? 'INVALID' : d.toISOString();
-    }
-
-    // YYYY-MM-DD HH:mm
-    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/.test(trimmed)) {
-      const [datePart, timePart] = trimmed.split(' ');
-      const d = new Date(`${datePart}T${timePart}:00`);
-      return Number.isNaN(d.getTime()) ? 'INVALID' : d.toISOString();
-    }
-
-    const fallback = new Date(trimmed);
-    return Number.isNaN(fallback.getTime()) ? 'INVALID' : fallback.toISOString();
+  const openPicker = (type: 'dateTime' | 'deadline') => {
+    Keyboard.dismiss();
+    setActivePicker(type);
   };
 
   const submit = async () => {
@@ -49,31 +51,13 @@ export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
       return setError('Please enter a task title.');
     }
 
-    let isoDateTime: string | null = null;
-    if (dateTimeStr.trim()) {
-      const parsed = parseDateTimeInput(dateTimeStr);
-      if (parsed === 'INVALID') {
-        return setError('Date-Time format should be YYYY-MM-DD or YYYY-MM-DD HH:mm');
-      }
-      isoDateTime = parsed;
-    }
-
-    let isoDeadline: string | null = null;
-    if (deadlineStr.trim()) {
-      const parsed = parseDateTimeInput(deadlineStr);
-      if (parsed === 'INVALID') {
-        return setError('Deadline format should be YYYY-MM-DD or YYYY-MM-DD HH:mm');
-      }
-      isoDeadline = parsed;
-    }
-
     setLoading(true);
     try {
       await api.createTask({
         title: title.trim(),
         description: description.trim(),
-        dateTime: isoDateTime,
-        deadline: isoDeadline,
+        dateTime: dateTimeIso,
+        deadline: deadlineIso,
         priority,
         category,
       });
@@ -87,8 +71,15 @@ export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topRow}>
           <Pressable onPress={() => navigation.goBack()} style={styles.close}>
             <Text style={styles.closeText}>×</Text>
@@ -111,7 +102,6 @@ export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
             onChangeText={setTitle}
             placeholder="e.g. Finish database migration"
             maxLength={120}
-            autoFocus
           />
 
           {/* Description */}
@@ -126,23 +116,37 @@ export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
             style={styles.notesInput}
           />
 
-          {/* Date-Time */}
+          {/* Date-Time (Scheduled) Picker */}
           <Text style={[styles.label, { marginTop: 18 }]}>DATE-TIME (SCHEDULED)</Text>
-          <Field
-            value={dateTimeStr}
-            onChangeText={setDateTimeStr}
-            placeholder="YYYY-MM-DD HH:mm (e.g. 2026-11-05 10:00)"
-            autoCapitalize="none"
-          />
+          <Pressable
+            onPress={() => openPicker('dateTime')}
+            style={styles.dateSelector}
+          >
+            <Text style={dateTimeIso ? styles.dateValueText : styles.datePlaceholderText}>
+              {dateTimeIso ? `📅  ${formatDisplayDate(dateTimeIso)}` : '📅  Tap to pick scheduled date & time'}
+            </Text>
+            {dateTimeIso ? (
+              <Pressable onPress={() => setDateTimeIso(null)} hitSlop={10} style={styles.dateClearBtn}>
+                <Text style={styles.dateClearText}>×</Text>
+              </Pressable>
+            ) : null}
+          </Pressable>
 
-          {/* Deadline */}
+          {/* Deadline Picker */}
           <Text style={[styles.label, { marginTop: 18 }]}>DEADLINE</Text>
-          <Field
-            value={deadlineStr}
-            onChangeText={setDeadlineStr}
-            placeholder="YYYY-MM-DD HH:mm (e.g. 2026-11-05 18:00)"
-            autoCapitalize="none"
-          />
+          <Pressable
+            onPress={() => openPicker('deadline')}
+            style={styles.dateSelector}
+          >
+            <Text style={deadlineIso ? styles.dateValueText : styles.datePlaceholderText}>
+              {deadlineIso ? `⏳  ${formatDisplayDate(deadlineIso)}` : '⏳  Tap to pick deadline date & time'}
+            </Text>
+            {deadlineIso ? (
+              <Pressable onPress={() => setDeadlineIso(null)} hitSlop={10} style={styles.dateClearBtn}>
+                <Text style={styles.dateClearText}>×</Text>
+              </Pressable>
+            ) : null}
+          </Pressable>
 
           {/* Priority */}
           <Text style={[styles.label, { marginTop: 20 }]}>PRIORITY</Text>
@@ -186,13 +190,29 @@ export function CreateTaskScreen({ navigation }: Props): React.JSX.Element {
           <PrimaryButton title="Save task  →" onPress={() => void submit()} loading={loading} />
         </View>
       </ScrollView>
+
+      {/* Date & Time Picker Modal */}
+      <DateTimePickerModal
+        visible={activePicker !== null}
+        title={activePicker === 'dateTime' ? 'Scheduled Date & Time' : 'Task Deadline'}
+        initialValue={activePicker === 'dateTime' ? dateTimeIso : deadlineIso}
+        onConfirm={(iso) => {
+          if (activePicker === 'dateTime') setDateTimeIso(iso);
+          else setDeadlineIso(iso);
+        }}
+        onClear={() => {
+          if (activePicker === 'dateTime') setDateTimeIso(null);
+          else setDeadlineIso(null);
+        }}
+        onClose={() => setActivePicker(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 22, paddingBottom: 35 },
+  content: { padding: 22, paddingBottom: 220 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   close: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   closeText: { color: colors.text, fontSize: 26, lineHeight: 28 },
@@ -203,6 +223,41 @@ const styles = StyleSheet.create({
   form: { marginTop: 22 },
   label: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   notesInput: { minHeight: 80, textAlignVertical: 'top' },
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    marginTop: 8,
+  },
+  datePlaceholderText: {
+    color: colors.muted,
+    fontSize: 14,
+  },
+  dateValueText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dateClearBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateClearText: {
+    color: colors.muted,
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
   priorityRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   priority: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 13, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   dot: { width: 7, height: 7, borderRadius: 4 },

@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -16,6 +15,8 @@ import { api } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { colors, spacing } from '../theme';
 import { TaskCard } from '../components/TaskCard';
+import { ProfileModal } from '../components/ProfileModal';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import { ErrorBanner, PrimaryButton, Eyebrow } from '../components/Ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -58,6 +59,11 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   const [filter, setFilter] = React.useState<FilterStatus>('all');
   const [sortMode, setSortMode] = React.useState<SortMode>('smart');
 
+  // Custom UI Modals
+  const [profileVisible, setProfileVisible] = React.useState(false);
+  const [taskToDelete, setTaskToDelete] = React.useState<Task | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
+
   const loadTasks = React.useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -99,24 +105,18 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
     }
   };
 
-  const deleteTask = (task: Task) => {
-    Alert.alert('Delete task?', `“${task.title}” will be removed permanently.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await api.deleteTask(task.id);
-              setTasks((current) => current.filter((item) => item.id !== task.id));
-            } catch (e) {
-              setError(e instanceof Error ? e.message : 'Could not delete task.');
-            }
-          })();
-        },
-      },
-    ]);
+  const handleConfirmDelete = async () => {
+    if (!taskToDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteTask(taskToDelete.id);
+      setTasks((current) => current.filter((item) => item.id !== taskToDelete.id));
+      setTaskToDelete(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete task.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const filteredTasks = React.useMemo(() => {
@@ -167,7 +167,7 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           <TaskCard
             task={item}
             onToggle={() => void toggleTask(item)}
-            onDelete={() => deleteTask(item)}
+            onDelete={() => setTaskToDelete(item)}
           />
         )}
         contentContainerStyle={styles.list}
@@ -179,15 +179,10 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
                 <Text style={styles.brand}>taskflow</Text>
               </View>
               <Pressable
-                onPress={() =>
-                  Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-                  ])
-                }
+                onPress={() => setProfileVisible(true)}
                 style={styles.avatar}
                 accessibilityRole="button"
-                accessibilityLabel="Sign out"
+                accessibilityLabel="Open profile"
               >
                 <Text style={styles.avatarText}>{user?.name?.charAt(0).toUpperCase() || 'U'}</Text>
               </Pressable>
@@ -304,6 +299,25 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
             tintColor={colors.violet}
           />
         }
+      />
+
+      {/* Profile & Account Sheet */}
+      <ProfileModal
+        visible={profileVisible}
+        user={user}
+        totalTasks={tasks.length}
+        completedTasks={completedCount}
+        onSignOut={() => void signOut()}
+        onClose={() => setProfileVisible(false)}
+      />
+
+      {/* Custom Delete Confirmation Dialog */}
+      <DeleteConfirmModal
+        visible={taskToDelete !== null}
+        task={taskToDelete}
+        loading={deleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setTaskToDelete(null)}
       />
     </View>
   );

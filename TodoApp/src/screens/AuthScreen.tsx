@@ -43,8 +43,15 @@ export function AuthScreen(): React.JSX.Element {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.glow} />
 
         <View style={styles.brandRow}>
@@ -93,7 +100,7 @@ export function AuthScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 30, overflow: 'hidden' },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 160 },
   glow: { position: 'absolute', top: -130, right: -130, width: 320, height: 320, borderRadius: 160, backgroundColor: '#282052', opacity: 0.7 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logo: { width: 36, height: 36, borderRadius: 13, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center' },
